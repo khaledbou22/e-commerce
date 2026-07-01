@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import TopBar from "./TopBar";
 import Navbar from "./Navbar";
 import ProductImageStack from "./ProductImageStack";
@@ -21,6 +21,17 @@ export default function HomeClient() {
   const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   const bundle = getBundleById(selectedBundleId);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.fbq) {
+      window.fbq("track", "ViewContent", {
+        content_name: "الأقدام المضادة للاهتزاز",
+        content_category: "Home Appliances",
+        currency: "DZD",
+        value: 890,
+      });
+    }
+  }, []);
 
   const handlePriceChange = useCallback(
     (state: {

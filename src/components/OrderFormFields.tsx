@@ -77,6 +77,16 @@ export default function OrderFormFields({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
+    if (typeof window !== "undefined" && window.fbq) {
+      window.fbq("track", "InitiateCheckout", {
+        content_name: "الأقدام المضادة للاهتزاز",
+        currency: "DZD",
+        value: totalPrice ?? 0,
+        num_items: bundle.quantity,
+      });
+    }
+
     setError("");
     if (!validateForm()) return;
     if (deliveryUnavailable || deliveryPrice === null || totalPrice === null) {
@@ -107,6 +117,16 @@ export default function OrderFormFields({
           total_price: totalPrice,
         }),
       });
+
+      if (typeof window !== "undefined" && window.fbq) {
+        window.fbq("track", "Purchase", {
+          content_name: "الأقدام المضادة للاهتزاز",
+          content_type: "product",
+          currency: "DZD",
+          value: totalPrice ?? 0,
+          num_items: bundle.quantity,
+        });
+      }
 
       setIsSuccess(true);
     } catch (err) {
