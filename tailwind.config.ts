@@ -8,9 +8,18 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        cairo: ["var(--font-cairo)", "sans-serif"],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        primary: {
+          DEFAULT: "#22c55e",
+          dark: "#16a34a",
+          light: "#4ade80",
+        },
+        cta: "#f59e0b",
       },
     },
   },
