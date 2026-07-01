@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent, Ref } from "react";
 import { WILAYAS } from "@/lib/wilayas";
 import { getBundleById } from "@/lib/bundles";
-import { getDeliveryPrice, getTotalPrice, DeliveryType } from "@/lib/delivery";
+import { getDeliveryPrice, getTotalPrice, isDeliveryAvailable, NOT_AVAILABLE_LABEL, DeliveryType } from "@/lib/delivery";
 import BundleSelector from "./BundleSelector";
 
 const SHEET_URL =
@@ -12,7 +12,11 @@ const SHEET_URL =
 interface OrderFormFieldsProps {
   selectedBundleId: string;
   onBundleChange: (id: string) => void;
-  onPriceChange: (total: number | null) => void;
+  onPriceChange: (state: {
+    total: number | null;
+    deliveryUnavailable: boolean;
+    wilayaSelected: boolean;
+  }) => void;
   submitButtonRef: Ref<HTMLButtonElement>;
 }
 
@@ -35,10 +39,27 @@ export default function OrderFormFields({
   const bundle = getBundleById(selectedBundleId);
   const deliveryPrice = getDeliveryPrice(wilaya, deliveryType);
   const totalPrice = getTotalPrice(bundle.price, wilaya, deliveryType);
+  const deliveryUnavailable = Boolean(wilaya && !isDeliveryAvailable(wilaya, deliveryType));
+  const homeAvailable = !wilaya || isDeliveryAvailable(wilaya, "home");
+  const officeAvailable = !wilaya || isDeliveryAvailable(wilaya, "office");
 
   useEffect(() => {
-    onPriceChange(totalPrice);
-  }, [totalPrice, onPriceChange]);
+    if (!wilaya) return;
+    setDeliveryType((current) => {
+      if (isDeliveryAvailable(wilaya, current)) return current;
+      if (isDeliveryAvailable(wilaya, "home")) return "home";
+      if (isDeliveryAvailable(wilaya, "office")) return "office";
+      return current;
+    });
+  }, [wilaya]);
+
+  useEffect(() => {
+    onPriceChange({
+      total: totalPrice,
+      deliveryUnavailable,
+      wilayaSelected: Boolean(wilaya),
+    });
+  }, [totalPrice, deliveryUnavailable, wilaya, onPriceChange]);
 
   function validateForm(): boolean {
     const errors: Record<string, string> = {};
@@ -47,6 +68,9 @@ export default function OrderFormFields({
     if (!fullName.trim()) errors.fullName = "الاسم واللقب مطلوب";
     if (!wilaya) errors.wilaya = "يرجى اختيار الولاية";
     if (!commune.trim()) errors.commune = "البلدية مطلوبة";
+    if (wilaya && !isDeliveryAvailable(wilaya, deliveryType)) {
+      errors.deliveryType = "نوع التوصيل المختار غير متوفر لهذه الولاية";
+    }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
@@ -55,8 +79,8 @@ export default function OrderFormFields({
     e.preventDefault();
     setError("");
     if (!validateForm()) return;
-    if (deliveryPrice === null || totalPrice === null) {
-      setError("يرجى اختيار الولاية لحساب سعر التوصيل");
+    if (deliveryUnavailable || deliveryPrice === null || totalPrice === null) {
+      setError("نوع التوصيل المختار غير متوفر لهذه الولاية");
       return;
     }
 
@@ -185,15 +209,17 @@ export default function OrderFormFields({
 
       <div className="grid grid-cols-2 gap-3">
         {[
-          { value: "home" as const, icon: "🏠", label: "التوصيل لباب المنزل" },
-          { value: "office" as const, icon: "🏢", label: "التوصيل للمكتب" },
+          { value: "home" as const, icon: "🏠", label: "التوصيل لباب المنزل", available: homeAvailable },
+          { value: "office" as const, icon: "🏢", label: "التوصيل للمكتب", available: officeAvailable },
         ].map((opt) => (
           <label
             key={opt.value}
-            className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition text-center text-sm font-medium ${
-              deliveryType === opt.value
-                ? "border-primary bg-green-50 text-primary"
-                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+            className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition text-center text-sm font-medium ${
+              !opt.available
+                ? "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                : deliveryType === opt.value
+                  ? "border-primary bg-green-50 text-primary cursor-pointer"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 cursor-pointer"
             } ${isLoading ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <input
@@ -202,12 +228,15 @@ export default function OrderFormFields({
               value={opt.value}
               checked={deliveryType === opt.value}
               onChange={() => setDeliveryType(opt.value)}
-              disabled={isLoading}
+              disabled={isLoading || !opt.available}
               className="sr-only"
             />
             <span className="text-2xl">{opt.icon}</span>
             <span className="leading-tight">{opt.label}</span>
-            {deliveryType === opt.value && (
+            {!opt.available && wilaya && (
+              <span className="text-xs text-red-500 font-semibold">{NOT_AVAILABLE_LABEL}</span>
+            )}
+            {deliveryType === opt.value && opt.available && (
               <span className="w-5 h-5 rounded-full bg-primary text-white text-xs flex items-center justify-center">
                 ✓
               </span>
@@ -215,18 +244,29 @@ export default function OrderFormFields({
           </label>
         ))}
       </div>
+      {fieldErrors.deliveryType && (
+        <p className="text-red-500 text-xs">{fieldErrors.deliveryType}</p>
+      )}
 
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
         <div className="flex justify-between text-sm text-gray-600">
           <span>التوصيل:</span>
           <span className="font-semibold text-gray-800">
-            {deliveryPrice !== null ? `${deliveryPrice} DA` : "—"}
+            {!wilaya
+              ? "—"
+              : deliveryUnavailable
+                ? NOT_AVAILABLE_LABEL
+                : `${deliveryPrice} DA`}
           </span>
         </div>
         <div className="flex justify-between items-center pt-2 border-t border-gray-200">
           <span className="font-bold text-gray-900">المجموع:</span>
           <span className="text-2xl font-extrabold text-gray-900">
-            {totalPrice !== null ? `${totalPrice} DA` : "—"}
+            {!wilaya
+              ? "—"
+              : deliveryUnavailable
+                ? NOT_AVAILABLE_LABEL
+                : `${totalPrice} DA`}
           </span>
         </div>
       </div>
@@ -240,7 +280,7 @@ export default function OrderFormFields({
       <button
         ref={submitButtonRef}
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || deliveryUnavailable}
         className="w-full bg-primary hover:bg-primary-dark text-white font-bold text-lg py-4 rounded-xl transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
       >
         {isLoading ? (

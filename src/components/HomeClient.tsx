@@ -13,14 +13,25 @@ import { getBundleById } from "@/lib/bundles";
 
 export default function HomeClient() {
   const [selectedBundleId, setSelectedBundleId] = useState("b4");
-  const [totalPrice, setTotalPrice] = useState<number | null>(null);
+  const [priceState, setPriceState] = useState<{
+    total: number | null;
+    deliveryUnavailable: boolean;
+    wilayaSelected: boolean;
+  }>({ total: null, deliveryUnavailable: false, wilayaSelected: false });
   const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   const bundle = getBundleById(selectedBundleId);
 
-  const handlePriceChange = useCallback((total: number | null) => {
-    setTotalPrice(total);
-  }, []);
+  const handlePriceChange = useCallback(
+    (state: {
+      total: number | null;
+      deliveryUnavailable: boolean;
+      wilayaSelected: boolean;
+    }) => {
+      setPriceState(state);
+    },
+    []
+  );
 
   return (
     <>
@@ -70,7 +81,10 @@ export default function HomeClient() {
       </main>
 
       <StickyBottomBar
-        totalPrice={totalPrice ?? bundle.price}
+        bundlePrice={bundle.price}
+        totalPrice={priceState.total}
+        deliveryUnavailable={priceState.deliveryUnavailable}
+        wilayaSelected={priceState.wilayaSelected}
         submitButtonRef={submitButtonRef}
       />
     </>
